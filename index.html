@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Report: Gemini Gacha Simulation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- 
+    Chosen Palette: Cosmic Dust (Light beige/gray background, dark text, muted purple accent)
+    Application Structure Plan: A thematic, single-page application that guides the user through the concepts of the report before presenting the interactive simulator. The flow is designed for learning and engagement: 1. Introduction, 2. Interactive explanation of Gacha Mechanics with visualizations, 3. A step-by-step guide to the Gemini/Colab setup, 4. The fully interactive Gacha Simulator as the centerpiece, and 5. A section for advanced concepts including a new Character Pool Management section. This structure transforms a linear tutorial into an explorable, hands-on tool, prioritizing user understanding and interaction over a rigid, chapter-by-chapter layout.
+    Visualization & Content Choices: 
+     - Introduction (Goal: Inform): Presented as a clean, welcoming text section.
+     - Gacha Mechanics (Goal: Explain/Compare): Uses interactive cards and a dynamic Chart.js line chart to visualize the abstract concept of 'soft pity', making it tangible. Users click to reveal details. This is more engaging than static text.
+     - Gemini Setup (Goal: Guide/Organize): Translates the report's setup table into an interactive checklist. Code blocks have copy functionality. This makes the tutorial actionable.
+     - Gacha Simulator (Goal: Engage/Relate): The core interactive element. Replicates the gacha experience with buttons, visual feedback for pulls, and a real-time status display. It includes a batch simulation feature that generates a Chart.js pie chart to visualize the results, adding a data analysis component.
+     - History (Goal: Track/Review): A new dedicated section to log every single pull chronologically, providing a comprehensive record separate from the inventory.
+     - Advanced Concepts (Goal: Inform/Organize/Control): Uses an accordion layout for further information. A new "Manage Character Pools" accordion will allow users to dynamically input character lists, interpreted as "web-sourced" data. This enables direct modification of the gacha pool, enhancing user control and customization.
+    CONFIRMATION: NO SVG graphics used. NO Mermaid JS used.
+    -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #F5F3F4;
+            color: #1c1917;
+        }
+        .section {
+            display: none;
+        }
+        .section.active {
+            display: block;
+        }
+        .nav-button {
+            transition: all 0.3s ease;
+        }
+        .nav-button.active {
+            background-color: #8B5CF6;
+            color: white;
+            font-weight: 600;
+        }
+        .card:not(.no-hover-effect):hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -2px rgb(0 0 0 / 0.1);
+        }
+        .card {
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .pull-result {
+            animation: fadeIn 0.5s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div class="container mx-auto p-4 md:p-8 max-w-7xl">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-bold text-gray-800">Interactive Report</h1>
+            <p class="text-lg text-gray-600 mt-2">Building a Honkai: Star Rail Gacha Simulation with Google Gemini</p>
+        </header>
+
+        <nav class="flex flex-wrap justify-center gap-2 md:gap-4 mb-12 bg-white p-3 rounded-full shadow-md">
+            <button class="nav-button px-4 py-2 rounded-full text-sm md:text-base font-medium text-gray-700 hover:bg-purple-100" onclick="showSection('introduction')">Introduction</button>
+            <button class="nav-button px-4 py-2 rounded-full text-sm md:text-base font-medium text-gray-700 hover:bg-purple-100" onclick="showSection('mechanics')">Gacha Mechanics</button>
+            <button class="nav-button px-4 py-2 rounded-full text-sm md:text-base font-medium text-gray-700 hover:bg-purple-100" onclick="showSection('setup')">Gemini Setup</button>
+            <button class="nav-button px-4 py-2 rounded-full text-sm md:text-base font-medium text-gray-700 hover:bg-purple-100" onclick="showSection('simulator')">Live Simulator</button>
+            <button class="nav-button px-4 py-2 rounded-full text-sm md:text-base font-medium text-gray-700 hover:bg-purple-100" onclick="showSection('history')">History</button>
+            <button class="nav-button px-4 py-2 rounded-full text-sm md:text-base font-medium text-gray-700 hover:bg-purple-100" onclick="showSection('advanced')">Advanced Concepts</button>
+        </nav>
+
+        <main>
+            <section id="introduction" class="section">
+                <div class="card p-6 md:p-8">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">Leveraging Gemini for Game Simulations</h2>
+                    <div class="space-y-4 text-gray-700 leading-relaxed">
+                        <p>Google Gemini represents a significant advancement in generative artificial intelligence, offering robust capabilities for understanding complex natural language prompts and translating them into functional Python code. This capacity positions Gemini as an invaluable asset for developers aiming to accelerate prototyping, automate routine coding tasks, and generate intricate logic for diverse applications, including sophisticated simulations. Its ability to interpret detailed requirements and produce coherent code structures streamlines the development workflow, making complex projects more accessible and efficient.</p>
+                        <p>For the purpose of developing a Honkai: Star Rail gacha simulation, Google Colab serves as an exceptionally suitable environment. Colab provides a highly accessible and pre-configured cloud-based Jupyter notebook environment, eliminating the need for extensive local setup. Its advantages include free access to computational resources, seamless integration with other Google services, and simplified procedures for getting started.</p>
+                        <p>The core of this project revolves around the "gacha" mechanic, a prevalent monetization strategy in modern video games. This system, akin to real-world capsule toy machines or loot boxes, involves players expending in-game currency for a chance to acquire random virtual items. By using Honkai: Star Rail as a case study, this application demonstrates how its specific game mechanics, such as character acquisition probabilities and the nuanced "pity" systems, can be simulated and understood interactively.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="mechanics" class="section">
+                <div class="text-center mb-8">
+                     <h2 class="text-2xl font-bold text-gray-800">The Blueprint: Understanding Gacha Mechanics</h2>
+                     <p class="text-gray-600 mt-2">This section provides an interactive guide to the core rules of Honkai: Star Rail's gacha system. Click on each card to learn more and see how concepts like "pity" work in practice.</p>
+                </div>
+                <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div class="card p-6">
+                        <h3 class="text-xl font-semibold mb-2">Pull Rates & Rarity</h3>
+                        <p>The base probabilities for acquiring items of different rarities. These rates are fundamental to the simulation's statistical accuracy.</p>
+                        <ul class="list-disc list-inside mt-4 space-y-2 text-sm">
+                            <li><span class="font-bold text-purple-600">5-Star (⭐⭐⭐⭐⭐):</span> 0.6% base chance</li>
+                            <li><span class="font-bold text-yellow-500">4-Star (⭐⭐⭐⭐):</span> 5.1% base chance</li>
+                            <li><span class="font-bold text-gray-500">3-Star (⭐⭐⭐):</span> 94.3% base chance</li>
+                        </ul>
+                    </div>
+                    <div class="card p-6">
+                        <h3 class="text-xl font-semibold mb-2">The 50/50 System</h3>
+                        <p>On Character Event banners, when you pull a 5-star, there's a 50% chance it's the featured character.</p>
+                        <ul class="list-disc list-inside mt-4 space-y-2 text-sm">
+                            <li><span class="font-bold text-green-600">Win 50/50:</span> You get the featured character!</li>
+                            <li><span class="font-bold text-red-600">Lose 50/50:</span> You get a standard 5-star character instead.</li>
+                            <li><span class="font-bold text-blue-600">Guaranteed:</span> After losing a 50/50, your next 5-star is <span class="underline">guaranteed</span> to be the featured character.</li>
+                        </ul>
+                    </div>
+                    <div class="card p-6 md:col-span-2 lg:col-span-1">
+                         <h3 class="text-xl font-semibold mb-2">Hard Pity</h3>
+                         <p>A guaranteed safety net to ensure you eventually get a high-rarity item.</p>
+                         <ul class="list-disc list-inside mt-4 space-y-2 text-sm">
+                             <li><span class="font-bold">5-Star Pity:</span> Guaranteed at 90 pulls.</li>
+                             <li><span class="font-bold">4-Star Pity:</span> Guaranteed at 10 pulls.</li>
+                         </ul>
+                    </div>
+                </div>
+                <div class="card p-6 md:p-8 mt-8">
+                    <h3 class="text-xl font-semibold mb-2 text-center">Visualizing Soft Pity</h3>
+                    <p class="text-center text-gray-600 mb-4">"Soft Pity" is a hidden mechanic where your chance of getting a 5-star dramatically increases after a certain point (pull 74) before you hit the hard pity at 90. This chart illustrates the increasing probability.</p>
+                    <div class="chart-container">
+                        <canvas id="softPityChart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <section id="setup" class="section">
+                 <div class="text-center mb-8">
+                     <h2 class="text-2xl font-bold text-gray-800">The Engine: Gemini & Colab Setup Guide</h2>
+                     <p class="text-gray-600 mt-2">This is an interactive checklist based on the report, guiding you through setting up Gemini in a Google Colab notebook. You can copy code snippets directly.</p>
+                </div>
+                <div class="card p-6 md:p-8">
+                    <ul class="space-y-6">
+                        <li class="flex items-start gap-4">
+                            <input type="checkbox" class="mt-1 h-5 w-5 rounded border-gray-300 text-purple-600 focus:ring-purple-500">
+                            <div>
+                                <h4 class="font-semibold">1. Install Gemini Python SDK</h4>
+                                <p class="text-gray-600 text-sm mb-2">Install the recommended `google-genai` SDK. This is the new, unified SDK for Google's generative AI models.</p>
+                                <div class="bg-gray-800 rounded-lg p-3 text-sm flex justify-between items-center no-hover-effect">
+                                    <code class="text-gray-300">!pip install --upgrade google-genai</code>
+                                    <button onclick="copyToClipboard('!pip install --upgrade google-genai')" class="text-gray-400 hover:text-white">📋</button>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="flex items-start gap-4">
+                            <input type="checkbox" class="mt-1 h-5 w-5 rounded border-gray-300 text-purple-600 focus:ring-purple-500">
+                            <div>
+                                <h4 class="font-semibold">2. Obtain Gemini API Key</h4>
+                                <p class="text-gray-600 text-sm">Generate a new API key from Google AI Studio. This is your credential for authenticating requests.</p>
+                            </div>
+                        </li>
+                         <li class="flex items-start gap-4">
+                            <input type="checkbox" class="mt-1 h-5 w-5 rounded border-gray-300 text-purple-600 focus:ring-purple-500">
+                            <div>
+                                <h4 class="font-semibold">3. Configure Colab Secrets Manager</h4>
+                                <p class="text-gray-600 text-sm">Open the "Secrets" tab (🔑) in the left panel of your Colab notebook. Create a new secret named `GOOGLE_API_KEY` and paste your key. This keeps it secure and out of your code.</p>
+                            </div>
+                        </li>
+                        <li class="flex items-start gap-4">
+                            <input type="checkbox" class="mt-1 h-5 w-5 rounded border-gray-300 text-purple-600 focus:ring-purple-500">
+                            <div>
+                                <h4 class="font-semibold">4. Initialize Gemini SDK in Python</h4>
+                                <p class="text-gray-600 text-sm mb-2">Use the following code to retrieve the key from secrets and configure the SDK.</p>
+                                <div class="bg-gray-800 rounded-lg p-3 text-sm no-hover-effect">
+                                    <pre><code id="init-code" class="text-gray-300">from google.colab import userdata
+import google.generativeai as genai
+
+GOOGLE_API_KEY = userdata.get('GOOGLE_API_KEY')
+genai.configure(api_key=GOOGLE_API_KEY)
+
+model = genai.GenerativeModel('gemini-pro')</code></pre>
+                                    <button onclick="copyToClipboard(document.getElementById('init-code').innerText)" class="text-gray-400 hover:text-white">📋</button>
+                                </div>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </section>
+            
+            <section id="simulator" class="section">
+                 <div class="text-center mb-8">
+                     <h2 class="text-2xl font-bold text-gray-800">The Simulator in Action</h2>
+                     <p class="text-gray-600 mt-2">Time to try your luck! Use the simulator below to perform pulls and see the gacha mechanics in real-time. Your inventory and pity status will update with each pull.</p>
+                </div>
+                <div class="grid lg:grid-cols-3 gap-8">
+                    <div class="lg:col-span-2 card p-6">
+                        <h3 class="font-semibold text-xl mb-4 border-b pb-3">Warp Terminal</h3>
+                        <div class="text-center mb-6">
+                            <p class="mb-4 text-gray-600">Featured 5-Star: 
+                                <span id="current-featured-char" class="font-bold text-purple-600"></span>
+                                <select id="featured-char-select" onchange="gacha.setFeaturedCharacter(this.value)" 
+                                        class="ml-2 p-1 border border-gray-300 rounded-md bg-white text-gray-800">
+                                    <!-- Options will be populated by JS -->
+                                </select>
+                            </p>
+                            <div class="flex justify-center gap-4">
+                                <button onclick="gacha.performSinglePull()" class="bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg hover:bg-gray-800 transition-colors">Single Warp</button>
+                                <button onclick="gacha.performTenPull()" class="bg-purple-600 text-white font-bold py-2 px-8 rounded-lg hover:bg-purple-700 transition-colors">Warp x10</button>
+                            </div>
+                        </div>
+                        <div id="pull-results-container" class="bg-gray-100 rounded-lg p-4 min-h-[200px]">
+                            <h4 class="font-semibold mb-2">Latest Pulls:</h4>
+                            <div id="pull-results" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                                <p class="text-gray-500 col-span-full text-center mt-8">Press a warp button to begin!</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card p-6">
+                        <h3 class="font-semibold text-xl mb-4 border-b pb-3">Status & Inventory</h3>
+                        <div id="pity-status" class="mb-6">
+                             <h4 class="font-semibold mb-2">Pity Status:</h4>
+                             <!-- Pity status will be rendered here by JS -->
+                        </div>
+                        <div id="inventory-container">
+                            <h4 class="font-semibold mb-2">Inventory:</h4>
+                            <div id="inventory" class="space-y-1 text-sm max-h-80 overflow-y-auto pr-2">
+                                <p class="text-gray-500">Your inventory is empty.</p>
+                            </div>
+                        </div>
+                         <button onclick="gacha.resetSimulation()" class="w-full mt-6 bg-red-500 text-white font-semibold py-2 rounded-lg hover:bg-red-600 transition-colors text-sm">Reset Simulation</button>
+                    </div>
+                </div>
+                <div class="card p-6 md:p-8 mt-8">
+                    <h3 class="font-semibold text-xl mb-4 text-center">Batch Simulation & Analysis</h3>
+                    <div class="flex flex-col md:flex-row items-center justify-center gap-4">
+                        <input id="batch-pull-count" type="number" value="1000" class="border-gray-300 rounded-md shadow-sm focus:border-purple-500 focus:ring-purple-500">
+                        <button onclick="runBatchSimulation()" class="bg-blue-600 text-white font-bold py-2 px-8 rounded-lg hover:bg-blue-700 transition-colors">Run Batch Simulation</button>
+                    </div>
+                    <div id="batch-results-container" class="mt-6" style="display: none;">
+                        <p id="batch-summary" class="text-center mb-4"></p>
+                        <div class="chart-container">
+                            <canvas id="batchRarityChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="history" class="section">
+                <div class="card p-6 md:p-8">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">Pull History</h2>
+                    <p class="text-gray-600 mt-2 mb-4 text-center">A comprehensive record of every pull you've made in the simulator, ordered from newest to oldest.</p>
+                    <div id="full-pull-history" class="bg-gray-100 rounded-lg p-4 max-h-[500px] overflow-y-auto">
+                        <p class="text-gray-500 text-center">No pulls recorded yet.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="advanced" class="section">
+                 <div class="text-center mb-8">
+                     <h2 class="text-2xl font-bold text-gray-800">Advanced Concepts & Next Steps</h2>
+                     <p class="text-gray-600 mt-2">Explore these topics to further enhance the simulation and deepen your understanding of Gemini's capabilities.</p>
+                </div>
+                <div class="space-y-4">
+                    <details class="card p-4 cursor-pointer">
+                        <summary class="font-semibold text-lg">Refining the Gacha Logic</summary>
+                        <div class="mt-2 text-gray-600 space-y-2">
+                            <p>The basic simulation can be expanded to incorporate more complex mechanics, such as separate Light Cone banners, specific 4-star rate-ups, and handling for duplicate pulls (e.g., converting them to Eidolons or Starlight).</p>
+                        </div>
+                    </details>
+                    <details class="card p-4 cursor-pointer">
+                        <summary class="font-semibold text-lg">Visualizing Simulation Results</summary>
+                        <div class="mt-2 text-gray-600 space-y-2">
+                            <p>Beyond the simple rarity chart, you can use libraries like Matplotlib or Seaborn (in a Colab environment) to plot the distribution of pulls required for a 5-star, showing the impact of pity, or calculate the average number of pulls needed for a featured character.</p>
+                        </div>
+                    </details>
+                    <details class="card p-4 cursor-pointer">
+                        <summary class="font-semibold text-lg">Exploring Other Gemini Features</summary>
+                        <div class="mt-2 text-gray-600 space-y-2">
+                            <p>Gemini's "function calling" capability offers a powerful way for Gemini to interact with your code. Instead of generating a fixed interactive loop, you could define Python functions and allow Gemini to suggest calls to them based on natural language prompts (e.g., "Simulate 50 pulls and show me my 5-star characters"). This enables more dynamic and conversational interactions.</p>
+                        </div>
+                    </details>
+                     <details class="card p-4 cursor-pointer">
+                        <summary class="font-semibold text-lg">Best Practices for AI Development</summary>
+                        <div class="mt-2 text-gray-600 space-y-2">
+                            <ul class="list-disc list-inside space-y-1">
+                                <li><strong>Always Review:</strong> Critically review all generated code for correctness, bugs, and security.</li>
+                                <li><strong>Understand the Logic:</strong> Strive to understand why the code works, rather than just copying it.</li>
+                                <li><strong>Be Specific:</strong> The quality of AI-generated code is directly proportional to the clarity of your prompts.</li>
+                                <li><strong>Iterate and Refine:</strong> Treat AI-assisted coding as an iterative process of prompting, reviewing, and refining.</li>
+                            </ul>
+                        </div>
+                    </details>
+                    <!-- New section for Character Pool Management -->
+                    <details class="card p-4 cursor-pointer">
+                        <summary class="font-semibold text-lg">Manage Character Pools</summary>
+                        <div class="mt-4 space-y-4">
+                            <p class="text-sm text-gray-600">You can paste comma-separated lists of characters (e.g., from a wiki page) to customize the gacha pools. Click "Load Pools" to apply changes.</p>
+                            <div>
+                                <label for="all-5-star-input" class="block text-sm font-medium text-gray-700">All Possible 5-Star Characters (Featured + Standard)</label>
+                                <textarea id="all-5-star-input" rows="3" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm" placeholder="e.g., Jing Yuan, Seele, Kafka, Himeko, Welt, Bronya"></textarea>
+                            </div>
+                            <div>
+                                <label for="standard-5-star-input" class="block text-sm font-medium text-gray-700">Standard 5-Star Characters (Lost 50/50 Pool)</label>
+                                <textarea id="standard-5-star-input" rows="2" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm" placeholder="e.g., Himeko, Welt, Bronya, Gepard, Clara, Yanqing, Bailu"></textarea>
+                            </div>
+                            <div>
+                                <label for="all-4-star-input" class="block text-sm font-medium text-gray-700">All 4-Star Characters</label>
+                                <textarea id="all-4-star-input" rows="3" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm" placeholder="e.g., Sushang, Tingyun, March 7th, Dan Heng, Asta, Herta"></textarea>
+                            </div>
+                            <button onclick="loadCharacterPoolsFromUI()" class="bg-purple-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-purple-700 transition-colors">Load Character Pools</button>
+                            <p id="pool-load-status" class="mt-2 text-sm text-gray-600"></p>
+                        </div>
+                    </details>
+                </div>
+            </section>
+        </main>
+    </div>
+    
+    <div id="toast" class="fixed top-5 right-5 bg-green-500 text-white py-2 px-4 rounded-lg shadow-lg" style="display: none;">
+        Copied to clipboard!
+    </div>
+
+    <script>
+        const sections = document.querySelectorAll('.section');
+        const navButtons = document.querySelectorAll('.nav-button');
+
+        function showSection(sectionId) {
+            sections.forEach(section => {
+                section.classList.toggle('active', section.id === sectionId);
+            });
+            navButtons.forEach(button => {
+                button.classList.toggle('active', button.getAttribute('onclick').includes(sectionId));
+            });
+            // Update history visibility when its section is activated
+            if (sectionId === 'history') {
+                gacha.displayFullHistory();
+            }
+        }
+
+        function copyToClipboard(text) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+
+            const toast = document.getElementById('toast');
+            toast.style.display = 'block';
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 2000);
+        }
+        
+        // Soft Pity Chart
+        const softPityData = {
+            labels: Array.from({length: 17}, (_, i) => 74 + i),
+            datasets: [{
+                label: '5-Star Probability (%)',
+                data: [],
+                borderColor: '#8B5CF6',
+                backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                fill: true,
+                tension: 0.4,
+            }]
+        };
+
+        const baseRate = 0.006;
+        const hardPity = 90;
+        const softPityStart = 74;
+        const rateIncrease = (1.0 - baseRate) / (hardPity - softPityStart);
+        
+        softPityData.datasets[0].data = softPityData.labels.map(pull => {
+             const prob = baseRate + (pull - softPityStart + 1) * rateIncrease;
+             return Math.min(prob, 1.0) * 100;
+        });
+
+        const softPityChartCtx = document.getElementById('softPityChart').getContext('2d');
+        const softPityChart = new Chart(softPityChartCtx, {
+            type: 'line',
+            data: softPityData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: {
+                            callback: function(value) {
+                                return value + '%'
+                            }
+                        }
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Pull Count'
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+
+        // Gacha Simulator Logic
+        class GachaSimulator {
+            constructor() {
+                this.five_star_base_rate = 0.006;
+                this.four_star_base_rate = 0.051;
+                this.soft_pity_start_5_star = 74;
+                this.hard_pity_5_star = 90;
+                this.soft_pity_start_4_star = 9;
+                this.hard_pity_4_star = 10;
+                this.featured_5_star_chance = 0.5;
+
+                // Default pools (can be overridden by user input)
+                this.all_possible_5_stars = [
+                    'Jing Yuan', 'Seele', 'Kafka', 'Blade', 'Silver Wolf', 'Luocha', 'Fu Xuan',
+                    'Dan Heng Imbibitor Lunae', 'Topaz & Numby', 'Huohuo', 'Argenti', 'Ruan Mei',
+                    'Dr. Ratio', 'Black Swan', 'Sparkle', 'Acheron', 'Aventurine'
+                ];
+                
+                this.standard_5_star_pool_base = ['Himeko', 'Welt', 'Bronya', 'Gepard', 'Clara', 'Yanqing', 'Bailu'];
+                
+                this.four_star_character_pool = [
+                    'Sushang', 'Tingyun', 'March 7th', 'Dan Heng', 'Asta', 'Herta', 'Serval', 
+                    'Pela', 'Hook', 'Natasha', 'Qingque', 'Sampo', 'Arlan', 'Hanya', 'Guinaifen',
+                    'Luka', 'Lynx', 'Xueyi', 'Misha', 'Gallagher'
+                ];
+                
+                // Initialize character pools
+                this.loadCharacterPools(
+                    this.all_possible_5_stars.join(', '),
+                    this.standard_5_star_pool_base.join(', '),
+                    this.four_star_character_pool.join(', ')
+                );
+
+                // Initialize with a default featured character
+                this.setFeaturedCharacter('Jing Yuan'); 
+
+                this.resetSimulation(); // This will call updateUI
+            }
+
+            // Method to load character pools from string input
+            loadCharacterPools(all5StarStr, standard5StarStr, all4StarStr) {
+                const parseList = (str) => str.split(',').map(s => s.trim()).filter(s => s.length > 0);
+
+                this.all_possible_5_stars = parseList(all5StarStr);
+                this.standard_5_star_pool_base = parseList(standard5StarStr);
+                this.four_star_character_pool = parseList(all4StarStr);
+
+                // Ensure the featured character is still valid in the new all_possible_5_stars pool
+                if (!this.all_possible_5_stars.includes(this.featured_character)) {
+                    this.setFeaturedCharacter(this.all_possible_5_stars.length > 0 ? this.all_possible_5_stars[0] : 'No 5-star available');
+                } else {
+                    this.setFeaturedCharacter(this.featured_character); // Re-set to update standard pool filter
+                }
+
+                this.populateFeaturedCharacterDropdown();
+                this.updateUI();
+            }
+
+            setFeaturedCharacter(charName) {
+                this.featured_character = charName;
+                // Ensure featured character is removed from standard pool if it's naturally there
+                this.standard_5_star_pool = this.standard_5_star_pool_base.filter(name => name !== charName);
+                
+                const currentFeaturedCharSpan = document.getElementById('current-featured-char');
+                if (currentFeaturedCharSpan) {
+                    currentFeaturedCharSpan.innerText = this.featured_character; // Update display
+                }
+                this.updateUI(); // Update UI to reflect new featured character
+            }
+
+            _get_current_5_star_rate() {
+                if (this.five_star_pity_counter >= this.soft_pity_start_5_star) {
+                    const pity_increase_per_pull = (1.0 - this.five_star_base_rate) / (this.hard_pity_5_star - this.soft_pity_start_5_star);
+                    return this.five_star_base_rate + (this.five_star_pity_counter - this.soft_pity_start_5_star + 1) * pity_increase_per_pull;
+                }
+                return this.five_star_base_rate;
+            }
+            
+            _get_current_4_star_rate() {
+                 return this.four_star_base_rate;
+            }
+
+            performSinglePullLogic() { // Renamed to avoid direct UI manipulation
+                this.total_pulls += 1;
+                this.five_star_pity_counter += 1;
+                this.four_star_pity_counter += 1;
+
+                let pulled_item_info = {}; // Object to store all info for history
+                pulled_item_info.pull_number = this.total_pulls; // Store total pull count at the moment of this pull
+
+                let rarity = 3;
+
+                const current5StarRate = this._get_current_5_star_rate();
+
+                if (this.five_star_pity_counter === this.hard_pity_5_star) { // Exact hard pity trigger
+                    rarity = 5;
+                } else if (this.four_star_pity_counter === this.hard_pity_4_star) { // Exact hard pity trigger for 4-star
+                    rarity = 4;
+                } else {
+                    const roll = Math.random();
+                    if (roll < current5StarRate) {
+                        rarity = 5;
+                    } else if (roll < (current5StarRate + this._get_current_4_star_rate())) { // Roll against total of 5-star + 4-star
+                        rarity = 4;
+                    } else {
+                        rarity = 3;
+                    }
+                }
+
+                if (rarity === 5) {
+                    pulled_item_info.pity_at_pull = this.five_star_pity_counter; // Store pity count for this 5-star
+                    
+                    if (this.guaranteed_featured_5_star || Math.random() < this.featured_5_star_chance) {
+                        pulled_item_info.name = this.featured_character;
+                        pulled_item_info.type = 'featured';
+                        this.guaranteed_featured_5_star = false;
+                    } else {
+                        pulled_item_info.name = (this.standard_5_star_pool.length > 0 ? this.standard_5_star_pool.choice() : 'Standard 5-star (fallback)');
+                        pulled_item_info.type = 'standard';
+                        this.guaranteed_featured_5_star = true;
+                    }
+                    this.five_star_pity_counter = 0;
+                    this.four_star_pity_counter = 0;
+                } else if (rarity === 4) {
+                    pulled_item_info.name = (this.four_star_character_pool.length > 0 ? this.four_star_character_pool.choice() : '4-star Character (fallback)');
+                    pulled_item_info.type = 'standard';
+                    this.four_star_pity_counter = 0;
+                } else {
+                    pulled_item_info.name = '3-Star Light Cone';
+                    pulled_item_info.type = 'standard';
+                }
+                pulled_item_info.rarity = rarity;
+
+                this.inventory.push(pulled_item_info);
+                this.history.unshift(pulled_item_info); // Add to the beginning of history (newest first)
+                return pulled_item_info;
+            }
+
+            performSinglePull() {
+                const item = this.performSinglePullLogic();
+                document.getElementById('pull-results').innerHTML = ''; // Clear for single pull
+                this.displayPullResult([item]);
+                this.updateUI();
+            }
+
+            performTenPull() {
+                document.getElementById('pull-results').innerHTML = ''; // Clear for new 10-pull display
+                const pulledItems = [];
+                for (let i = 0; i < 10; i++) {
+                    const item = this.performSinglePullLogic(); // Use the logic function
+                    pulledItems.push(item);
+                }
+                this.displayPullResult(pulledItems, true); // Display all 10 at once
+                this.updateUI();
+            }
+
+            displayPullResult(items, isTenPull = false) {
+                 const container = document.getElementById('pull-results');
+                 if (!isTenPull) container.innerHTML = ''; // Only clear if it's not a batch being added
+
+                 if (container.querySelector('p.text-gray-500')) { // Remove initial message if present
+                     container.innerHTML = '';
+                 }
+
+                 items.forEach(item => {
+                     const pullDiv = document.createElement('div');
+                     let rarityClass = 'border-gray-400 text-gray-700';
+                     let rarityText = '⭐⭐⭐';
+                     if(item.rarity === 4) {
+                         rarityClass = 'border-purple-400 text-purple-700';
+                         rarityText = '⭐⭐⭐⭐';
+                     }
+                     if(item.rarity === 5) {
+                         rarityClass = 'border-yellow-400 text-yellow-600 bg-yellow-50';
+                         rarityText = '🎉⭐⭐⭐⭐⭐🎉';
+                     }
+                     
+                     pullDiv.className = `pull-result card p-2 text-center text-xs font-semibold border-2 ${rarityClass}`;
+                     pullDiv.innerHTML = `
+                         <div class="mb-1">${rarityText}</div>
+                         <div>${item.name}</div>
+                         ${item.rarity === 5 ? `<div class="text-xs text-gray-500 mt-1">Pity: ${item.pity_at_pull} | Total: ${item.pull_number}</div>` : ''}
+                     `;
+                     container.appendChild(pullDiv);
+                 });
+            }
+
+            displayFullHistory() {
+                const historyContainer = document.getElementById('full-pull-history');
+                historyContainer.innerHTML = ''; // Clear previous history
+                if (this.history.length === 0) {
+                    historyContainer.innerHTML = '<p class="text-gray-500 text-center">No pulls recorded yet.</p>';
+                    return;
+                }
+
+                this.history.forEach(item => {
+                    const historyItemDiv = document.createElement('div');
+                    let rarityClass = 'text-gray-700';
+                    let rarityText = '⭐⭐⭐';
+                    if (item.rarity === 4) {
+                        rarityClass = 'text-purple-700 font-medium';
+                        rarityText = '⭐⭐⭐⭐';
+                    }
+                    if (item.rarity === 5) {
+                        rarityClass = 'text-yellow-600 font-bold';
+                        rarityText = '⭐⭐⭐⭐⭐';
+                    }
+
+                    historyItemDiv.className = `flex items-center justify-between p-2 my-1 rounded-md bg-white shadow-sm ${rarityClass}`;
+                    historyItemDiv.innerHTML = `
+                        <div class="flex-shrink-0 w-16 text-right text-gray-500 text-xs">#${item.pull_number}</div>
+                        <div class="flex-grow ml-4">
+                            <span class="font-semibold">${item.name}</span>
+                            <span class="text-xs ml-2 ${rarityClass}">${rarityText}</span>
+                        </div>
+                        <div class="flex-shrink-0 ml-4 text-xs text-gray-500">
+                            ${item.rarity === 5 ? `(Pity: ${item.pity_at_pull})` : ''}
+                        </div>
+                    `;
+                    historyContainer.appendChild(historyItemDiv);
+                });
+            }
+
+            updateUI() {
+                this.updatePityStatus();
+                this.updateInventory();
+                // Ensure full history is updated when its section is active
+                if (document.getElementById('history').classList.contains('active')) {
+                    this.displayFullHistory();
+                }
+            }
+
+            updatePityStatus() {
+                const pityDiv = document.getElementById('pity-status');
+                pityDiv.innerHTML = `
+                     <h4 class="font-semibold mb-2">Pity Status:</h4>
+                     <p class="text-sm">Total Pulls: <span class="font-bold">${this.total_pulls}</span></p>
+                     <p class="text-sm">5-Star Pity: <span class="font-bold">${this.five_star_pity_counter}</span> / ${this.hard_pity_5_star}</p>
+                     <p class="text-sm">4-Star Pity: <span class="font-bold">${this.four_star_pity_counter}</span> / ${this.hard_pity_4_star}</p>
+                     <p class="text-sm mt-2 ${this.guaranteed_featured_5_star ? 'text-green-600 font-bold' : 'text-gray-600'}">
+                        ${this.guaranteed_featured_5_star ? 'Guaranteed Featured 5-Star!' : '50/50 Active'}
+                     </p>
+                `;
+            }
+
+            updateInventory() {
+                const inventoryDiv = document.getElementById('inventory');
+                if (!this.inventory || this.inventory.length === 0) { 
+                    inventoryDiv.innerHTML = '<p class="text-gray-500">Your inventory is empty.</p>';
+                    return;
+                }
+                inventoryDiv.innerHTML = '';
+                
+                const itemCounts = {};
+                this.inventory.forEach(item => {
+                    if (item && typeof item.name === 'string') { 
+                        itemCounts[item.name] = (itemCounts[item.name] || 0) + 1;
+                    } else {
+                        console.error("Invalid item or item name found in inventory:", item);
+                    }
+                });
+                
+                const sortedItems = Object.keys(itemCounts).map(name => {
+                    const originalItem = this.inventory.find(item => item.name === name);
+                    if (!originalItem) { 
+                        console.error("Item not found in inventory for name:", name);
+                        return { name: name, rarity: 0 }; 
+                    }
+                    return { name: name, rarity: originalItem.rarity };
+                }).sort((a,b) => b.rarity - a.rarity); 
+
+                sortedItems.forEach(item => {
+                    const itemDiv = document.createElement('div');
+                    let rarityColor = 'text-gray-700';
+                     if(item.rarity === 4) rarityColor = 'text-purple-700';
+                     if(item.rarity === 5) rarityColor = 'text-yellow-600 font-bold';
+                    itemDiv.className = `flex justify-between items-center ${rarityColor}`;
+                    itemDiv.innerHTML = `<span>${item.name}</span> <span class="font-mono bg-gray-200 px-2 py-0.5 rounded text-xs">x${itemCounts[item.name]}</span>`;
+                    inventoryDiv.appendChild(itemDiv);
+                });
+            }
+
+            resetSimulation() {
+                this.total_pulls = 0;
+                this.five_star_pity_counter = 0;
+                this.four_star_pity_counter = 0;
+                this.guaranteed_featured_5_star = false;
+                this.inventory = [];
+                this.history = []; // Clear history on reset
+                this.updateUI();
+                document.getElementById('pull-results').innerHTML = '<p class="text-gray-500 col-span-full text-center mt-8">Press a warp button to begin!</p>';
+                document.getElementById('batch-results-container').style.display = 'none';
+                // Reset selected value in dropdown and update displayed featured character
+                const selectElement = document.getElementById('featured-char-select');
+                selectElement.value = this.featured_character; 
+                document.getElementById('current-featured-char').innerText = this.featured_character;
+                // Clear history display
+                document.getElementById('full-pull-history').innerHTML = '<p class="text-gray-500 text-center">No pulls recorded yet.</p>';
+            }
+
+            populateFeaturedCharacterDropdown() {
+                const selectElement = document.getElementById('featured-char-select');
+                selectElement.innerHTML = ''; 
+                const sortedAll5Stars = [...this.all_possible_5_stars].sort(); 
+                sortedAll5Stars.forEach(char => {
+                    const option = document.createElement('option');
+                    option.value = char;
+                    option.textContent = char;
+                    if (char === this.featured_character) {
+                        option.selected = true;
+                    }
+                    selectElement.appendChild(option);
+                });
+                document.getElementById('current-featured-char').innerText = this.featured_character;
+            }
+        }
+        
+        const gacha = new GachaSimulator();
+
+        let batchChartInstance = null;
+        function runBatchSimulation() {
+            const pullCount = parseInt(document.getElementById('batch-pull-count').value) || 1000;
+            const tempSim = new GachaSimulator(); 
+            
+            const selectedFeaturedChar = document.getElementById('featured-char-select').value;
+            tempSim.loadCharacterPools( 
+                document.getElementById('all-5-star-input').value,
+                document.getElementById('standard-5-star-input').value,
+                document.getElementById('all-4-star-input').value
+            );
+            tempSim.setFeaturedCharacter(selectedFeaturedChar); 
+
+            for(let i=0; i<pullCount; i++) {
+                tempSim.performSinglePullLogic(); 
+            }
+
+            const rarityCounts = { '5': 0, '4': 0, '3': 0 };
+            tempSim.inventory.forEach(item => {
+                if (item && typeof item.name === 'string') { 
+                    rarityCounts[item.rarity.toString()]++;
+                }
+            });
+            
+            document.getElementById('batch-summary').innerText = `Results for ${pullCount} pulls: ${rarityCounts[5]} 5-Stars, ${rarityCounts[4]} 4-Stars, ${rarityCounts[3]} 3-Stars.`;
+
+            const chartData = {
+                labels: ['5-Star', '4-Star', '3-Star'],
+                datasets: [{
+                    label: 'Rarity Distribution',
+                    data: [rarityCounts[5], rarityCounts[4], rarityCounts[3]],
+                    backgroundColor: ['#FBBF24', '#8B5CF6', '#9CA3AF'],
+                    hoverOffset: 4
+                }]
+            };
+
+            const batchChartCtx = document.getElementById('batchRarityChart').getContext('2d');
+            if(batchChartInstance) {
+                batchChartInstance.destroy();
+            }
+            batchChartInstance = new Chart(batchChartCtx, {
+                type: 'pie',
+                data: chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                }
+            });
+
+            document.getElementById('batch-results-container').style.display = 'block';
+        }
+
+        // Helper for array random choice, similar to Python's random.choice
+        if (!Array.prototype.hasOwnProperty('choice')) {
+            Object.defineProperty(Array.prototype, 'choice', {
+                value: function() {
+                    return this[Math.floor(Math.random() * this.length)];
+                }
+            });
+        }
+
+        function loadCharacterPoolsFromUI() {
+            const all5StarInput = document.getElementById('all-5-star-input').value;
+            const standard5StarInput = document.getElementById('standard-5-star-input').value;
+            const all4StarInput = document.getElementById('all-4-star-input').value;
+
+            gacha.loadCharacterPools(all5StarInput, standard5StarInput, all4StarInput);
+            gacha.resetSimulation(); 
+            
+            const statusElement = document.getElementById('pool-load-status');
+            statusElement.innerText = "Character pools loaded successfully! Simulator reset.";
+            statusElement.style.color = 'green';
+            setTimeout(() => {
+                statusElement.innerText = '';
+            }, 3000);
+        }
+
+
+        // Initial setup
+        document.addEventListener('DOMContentLoaded', () => {
+            showSection('introduction');
+            navButtons[0].classList.add('active');
+
+            // Populate text areas with default lists for user to see/edit
+            document.getElementById('all-5-star-input').value = gacha.all_possible_5_stars.join(', ');
+            document.getElementById('standard-5-star-input').value = gacha.standard_5_star_pool_base.join(', ');
+            document.getElementById('all-4-star-input').value = gacha.four_star_character_pool.join(', ');
+
+            // Initial population of the dropdown after setting default pools
+            gacha.populateFeaturedCharacterDropdown();
+        });
+
+    </script>
+</body>
+</html>
